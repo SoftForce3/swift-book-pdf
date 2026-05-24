@@ -11,7 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import logging
+logger = logging.getLogger(__name__)
 from pathlib import Path
 
 from swift_book_pdf.blocks import parse_blocks
@@ -59,7 +60,11 @@ class LaTeXConverter:
         file_content = convert_markdown_links(file_content)
         file_content = [line.strip("\n") for line in file_content]
         if not file_content:
-            return []
+         logger.warning(
+          "Skipping empty markdown file: %s",
+          file_name,
+         )
+         return []
 
         chapter_title_box, file_content = generate_chapter_title(
             file_content,
