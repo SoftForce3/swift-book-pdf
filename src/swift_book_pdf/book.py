@@ -40,42 +40,72 @@ class PDFBookBuilder:
         converter: LaTeXConverter,
         latex_file_path: str,
     ) -> None:
+        logger.info("Generating LaTeX preamble...")
         latex = generate_preamble(self.config)
+
+        logger.info("Resolving Swift book version information...")
         self._version_info()
         # TODO: Use the version to generate a cover page
+
+        logger.info("Generating table of contents...")
         toc_latex, _ = self.toc.generate_toc_latex(converter=converter)
         latex += toc_latex + "\n"
-        for tag in self.toc.pdf_doc_tags:
+
+        total_docs = len(self.toc.pdf_doc_tags)
+        logger.info(f"Processing {total_docs} document sections...")
+
+        for index, tag in enumerate(self.toc.pdf_doc_tags, start=1):
+            logger.info(f"Processing section {index}/{total_docs}: <doc:{tag}>")
+
             if tag.lower() == NOTICES_DOC_KEY:
+                logger.info("Rendering legal notices section...")
                 latex += render_notices_latex(
                     self.config.doc_config.mode,
                     self.config.original_work_copyright_year_range,
                 )
                 latex += "\n"
                 continue
+
             file_path = None
             chapter_metadata = self.toc.chapter_metadata.get(tag.lower())
             if chapter_metadata:
                 file_path = chapter_metadata.file_path
+
             if file_path:
+                logger.info(f"Converting markdown file to LaTeX: {file_path}")
                 latex_content = converter.generate_latex(file_path)
                 latex += latex_content + "\n"
             else:
                 logger.warning(
                     f"Warning: No file found for tag <doc:{tag}>, skipping...",
                 )
+
         latex += r"\end{document}"
+
+        logger.info(f"Writing combined LaTeX file to {latex_file_path}")
         with Path(latex_file_path).open("w", encoding="utf-8") as f:
             f.write(latex)
 
+        logger.info("LaTeX content file generated successfully.")
+
     def build(self) -> None:
+        logger.info("Starting PDF book generation...")
+
         converter = LaTeXConverter(self.config)
         latex_file_path = Path(self.config.temp_dir) / "inner_content.tex"
+
+        logger.info("Preparing LaTeX source file...")
         self.process_files_in_order(converter, str(latex_file_path))
+
         logger.info(
             f"Creating PDF in {self.config.doc_config.mode.value} ({self.config.doc_config.appearance}) mode...",
         )
+
         pdf_converter = PDFConverter(self.config)
+
+        logger.info(
+            f"Running LaTeX compiler {self.config.doc_config.typesets} time(s)..."
+        )
         for _ in trange(self.config.doc_config.typesets, leave=False):
             pdf_converter.convert_to_pdf(str(latex_file_path))
 
@@ -85,6 +115,7 @@ class PDFBookBuilder:
             return
 
         try:
+            logger.info(f"Moving generated PDF to {self.config.output_path}")
             shutil.move(str(temp_pdf_path), self.config.output_path)
             logger.info(f"PDF saved to {self.config.output_path}")
         except (OSError, shutil.Error) as e:
