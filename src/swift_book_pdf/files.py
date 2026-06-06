@@ -107,12 +107,29 @@ def find_or_clone_swift_book_repo(
                 "--source-ref and --source-sha can't be used with --input-path. "
                 "Check out the desired revision in a separate local clone and pass that path with --input-path.",
             )
-        root_dir = Path(input_path) / "TSPL.docc"
+        input_dir = Path(input_path)
+ 
+        if not input_dir.exists():
+            raise FileNotFoundError(
+                f"Local input directory does not exist: {input_dir}\n"
+                "Check the path provided with --input-path and make sure the folder exists."
+            )
+ 
+        if not input_dir.is_dir():
+            raise NotADirectoryError(
+                f"Expected --input-path to point to a directory, but got a file: {input_dir}\n"
+                "Please provide the local Swift book repository folder."
+            )
+ 
+        root_dir = input_dir / "TSPL.docc"
         toc_file_path = root_dir / "The-Swift-Programming-Language.md"
         assets_dir = root_dir / "Assets"
+ 
         if not root_dir.exists():
             raise FileNotFoundError(
-                f"The specified input path {input_path} does not contain the Swift book repository.",
+                f"The local input directory exists, but it does not look like the Swift book repository: {input_dir}\n"
+                f"Expected to find the documentation folder at: {root_dir}\n"
+                "Make sure --input-path points to the root of a local swift-book checkout."
             )
         if not toc_file_path.exists():
             raise FileNotFoundError(
