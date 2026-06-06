@@ -15,7 +15,7 @@
 from pathlib import Path
 
 import click
-
+from swift_book_pdf.output_filename import normalize_pdf_output_filename
 from swift_book_pdf.book import build_pdf
 from swift_book_pdf.cli import (
     common_options,
@@ -189,25 +189,7 @@ def _resolve_pdf_output_path(output_path: str, output_filename: str | None) -> s
     if output_filename is None:
         return output_path
 
-    filename = output_filename.strip()
-
-    if not filename:
-        raise click.BadParameter(
-            "Output filename cannot be empty.",
-            param_hint="--output",
-        )
-
-    if Path(filename).name != filename:
-        raise click.BadParameter(
-            "Output filename must be a filename, not a path.",
-            param_hint="--output",
-        )
-
-    if Path(filename).suffix.lower() != ".pdf":
-        raise click.BadParameter(
-            "Output filename must end with .pdf.",
-            param_hint="--output",
-        )
+    filename = normalize_pdf_output_filename(output_filename)
 
     return str(Path(output_path) / filename)
 
