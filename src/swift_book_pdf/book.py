@@ -14,10 +14,9 @@
 
 import logging
 import shutil
+from swift_book_pdf.build_summary import BuildSummary
 from pathlib import Path
-
 from tqdm import trange
-
 from swift_book_pdf.config import Config, EPUBConfig, PDFConfig
 from swift_book_pdf.contents import resolve_version_info
 from swift_book_pdf.epub import EPUBBuilder
@@ -34,6 +33,7 @@ class PDFBookBuilder:
     def __init__(self, config: PDFConfig) -> None:
         self.config = config
         self.toc = _build_table_of_contents(config)
+        self.summary = BuildSummary()
 
     def process_files_in_order(
         self,
@@ -72,12 +72,22 @@ class PDFBookBuilder:
                 file_path = chapter_metadata.file_path
 
             if file_path:
-                logger.info(f"Converting markdown file to LaTeX: {file_path}")
-                latex_content = converter.generate_latex(file_path)
+              logger.info(f"Converting markdown file to LaTeX: {file_path}")
+              latex_content = converter.generate_latex(file_path)
+ 
+              if latex_content.strip():
                 latex += latex_content + "\n"
-            else:
+                self.summary.mark_processed()
+              else:
+                self.summary.mark_skipped()
                 logger.warning(
-                    f"Warning: No file found for tag <doc:{tag}>, skipping...",
+                f"Warning: File for tag <doc:{tag}> produced no LaTeX content, "
+                "skipping...",
+              )
+            else:
+                self.summary.mark_skipped()
+                logger.warning(
+                f"Warning: No file found for tag <doc:{tag}>, skipping...",
                 )
 
         latex += r"\end{document}"
@@ -117,12 +127,17 @@ class PDFBookBuilder:
         try:
             logger.info(f"Moving generated PDF to {self.config.output_path}")
             shutil.move(str(temp_pdf_path), self.config.output_path)
+            self.summary.set_output_path(self.config.output_path)
             logger.info(f"PDF saved to {self.config.output_path}")
+            self._log_build_summary()
         except (OSError, shutil.Error) as e:
             logger.error(
                 f"Failed to save PDF to {self.config.output_path}: {e}"
             )
-
+    def _log_build_summary(self) -> None:
+      for line in self.summary.format_lines():
+        logger.info(line)
+        
     def _version_info(self) -> str:
         return resolve_version_info(
             self.toc.file_content, self.config.override_version
