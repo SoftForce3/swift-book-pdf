@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-logger = logging.getLogger(__name__)
 from pathlib import Path
-
+ 
 from swift_book_pdf.blocks import parse_blocks
 from swift_book_pdf.config import PDFConfig
 from swift_book_pdf.files import get_file_name
@@ -26,28 +25,32 @@ from swift_book_pdf.markdown_helpers import (
     convert_markdown_links,
     remove_multiline_comments,
 )
-
-
+ 
+logger = logging.getLogger(__name__)
+ 
+ 
 class LaTeXConverter:
     def __init__(self, config: PDFConfig) -> None:
         self.config = config
-
+ 
     def generate_latex(self, file_path: str) -> str:
         file_name = get_file_name(file_path)
         path = Path(file_path)
+ 
         if not path.exists():
             raise FileNotFoundError(
                 f"Couldn't find the file {file_name} at {file_path}.",
             )
-
+ 
         with path.open("r", encoding="utf-8") as file:
             file_content = file.readlines()
-
+ 
         latex_lines = self.convert_file_to_latex(
-            file_content, file_name.lower()
+            file_content,
+            file_name.lower(),
         )
         return "\n".join(latex_lines)
-
+ 
     def convert_file_to_latex(
         self,
         file_content: list[str],
@@ -59,22 +62,21 @@ class LaTeXConverter:
         file_content = remove_multiline_comments(file_content)
         file_content = convert_markdown_links(file_content)
         file_content = [line.strip("\n") for line in file_content]
-        if not file_content:
-         logger.warning(
-          "Skipping empty markdown file: %s",
-          file_name,
-         )
-         return []
-
+ 
+        if not _has_renderable_markdown_content(file_content):
+            _log_skipped_markdown_file(file_name)
+            return []
+ 
         chapter_title_box, file_content = generate_chapter_title(
             file_content,
             file_name,
         )
-
+ 
         latex_lines = []
         latex_lines.extend(chapter_title_box.splitlines())
         latex_lines.append("")
         latex_lines.append("{\\BodyStyle\n")
+ 
         blocks = parse_blocks(file_content)
         body_latex = convert_blocks_to_latex(
             blocks,
@@ -85,6 +87,28 @@ class LaTeXConverter:
             self.config.font_config.main_font,
             self.config.doc_config.font_size,
         )
+ 
         latex_lines.extend(body_latex)
         latex_lines.append("}\n\\newpage\n")
         return latex_lines
+ 
+ 
+def _has_renderable_markdown_content(file_content: list[str]) -> bool:
+    """
+    Check whether a markdown file contains visible content.
+ 
+    Empty files and whitespace-only files should not create a chapter title,
+    an empty body section, or a blank page in the generated PDF.
+    """
+    for line in file_content:
+        if line.strip():
+            return True
+ 
+    return False
+ 
+ 
+def _log_skipped_markdown_file(file_name: str) -> None:
+    logger.warning(
+        "Skipping empty markdown file: %s",
+        file_name,
+    )
